@@ -110,7 +110,8 @@ internal class Parser
                 {
                     if (val < 2.0d)
                     {
-                        await Console.Out.WriteLineAsync(ze);
+                        await Console.Out.WriteLineAsync($"{name}. Найденный IR спектр имеет разрешение меньше 2.0.");
+                        return await Task.FromResult(false);
                     }
                 }
                 else
