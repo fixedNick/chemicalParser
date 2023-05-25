@@ -39,7 +39,7 @@ internal class Parser
             // Загружаем HTML-страницу
             HtmlDocument document = web.Load(linkBuilder.ToString());
 
-            var isIROnBasePage = await SearchForJCAMPFileLinkAndDownload(document, kvp.Key);
+            var isIROnBasePage = await SearchForJCAMPFileLinkAndDownload(document, kvp.Key, linkBuilder.ToString());
             if (isIROnBasePage == true) continue;
 
             var linkTags = document.QuerySelectorAll("#IR-Spec ~ ul > li > a");
@@ -51,7 +51,7 @@ internal class Parser
                     var encodedLink = new StringBuilder().Append(baseWebsiteLink).Append(link).ToString();
                     var decodedLink = System.Net.WebUtility.HtmlDecode(encodedLink);
                     HtmlDocument IRDoc = web.Load(decodedLink);
-                    await SearchForJCAMPFileLinkAndDownload(IRDoc, kvp.Key);
+                    await SearchForJCAMPFileLinkAndDownload(IRDoc, kvp.Key, decodedLink);
                 }
             }
 
@@ -82,13 +82,13 @@ internal class Parser
         while(true)
         {
             var fileName = $"{name}_{counter}.jdx";
-            if (File.Exists($"{downloadsDirectory}/{fileName}.jdx") == true)
+            if (File.Exists($"{downloadsDirectory}/{fileName}") == true)
                 counter++;
-            else return $"{fileName}.jdx";
+            else return $"{fileName}";
         }
     }
 
-    private async Task<bool> SearchForJCAMPFileLinkAndDownload(HtmlDocument IRDoc, string name)
+    private async Task<bool> SearchForJCAMPFileLinkAndDownload(HtmlDocument IRDoc, string name, string link)
     {
         bool isLinkFound = false;
 
@@ -106,18 +106,29 @@ internal class Parser
                 var tableData = row.QuerySelector("td");
                 if (tableData == null) continue;
 
-                if (double.TryParse(tableData.InnerText.Trim(), out double val) == true)
+                if (double.TryParse(tableData.InnerText.Replace('.', ',').Trim(), out double val) == true)
                 {
                     if (val < 2.0d)
                     {
-                        await Console.Out.WriteLineAsync($"{name}. Найденный IR спектр имеет разрешение меньше 2.0.");
+                        await Console.Out.WriteLineAsync($"{name}. Найденный IR спектр имеет разрешение меньше 2.0. [{val}]");
                         return await Task.FromResult(false);
                     }
                 }
                 else
                 {
-                    await Console.Out.WriteLineAsync($"{name}. Информационный элемент Разрешение найден, но не удалось получить его значение");
+                    var normalResults = new[]
+                    {
+                        "1 CM-1 AT 4000",
+                        "2 CM-1",
+                        "2.0 cm-1",
+                        "2-3 CM-1"
+                    };
+
+                    if (normalResults.Where(res => res.ToLower().Equals(tableData.InnerText.ToLower().Trim())).FirstOrDefault() == null)
+                    {
+                        await Console.Out.WriteLineAsync($"{name} [{link}]. Информационный элемент Разрешение найден, но не удалось получить его значение [{tableData.InnerText}]");
                         return await Task.FromResult(false);
+                    }
                 }
             }
         }
