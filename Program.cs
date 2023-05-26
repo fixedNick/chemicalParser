@@ -2,6 +2,7 @@
 using System;
 using chemicalParser;
 using System.Drawing.Text;
+using OfficeOpenXml;
 
 var filePath = "db.txt";
 if (File.Exists(filePath) == false)
@@ -12,6 +13,15 @@ if (File.Exists(filePath) == false)
 
 Dictionary<string, string> NameAndInchiKeyDict = new Dictionary<string, string>();
 
+//using(ExcelPackage package = new ExcelPackage(filePath))
+//{
+//    ExcelWorkbook wb = package.Workbook;
+//    ExcelWorksheet sheet = wb.Worksheets[0];
+//    var rows = sheet.Rows;
+//    var cols = sheet.Columns;
+//}
+
+//return;
 foreach (var line in File.ReadAllLines(filePath))
 {
     var data = line.Split(':');

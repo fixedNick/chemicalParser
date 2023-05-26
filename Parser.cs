@@ -58,7 +58,6 @@ internal class Parser
         }
     }
 
-
     private static string DownloadsDirectory = "downloads";
     private async Task DownloadFile(string link, string name)
     {
@@ -121,7 +120,8 @@ internal class Parser
                         "1 CM-1 AT 4000",
                         "2 CM-1",
                         "2.0 cm-1",
-                        "2-3 CM-1"
+                        "2-3 CM-1",
+                        "4 CM-1"
                     };
 
                     if (normalResults.Where(res => res.ToLower().Equals(tableData.InnerText.ToLower().Trim())).FirstOrDefault() == null)
