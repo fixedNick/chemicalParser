@@ -4,9 +4,8 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace chemicalParser
+namespace chemicalParser.Readers;
+class CsvReader : ReaderBase, IReader
 {
-    internal class ExcelReader
-    {
-    }
+
 }

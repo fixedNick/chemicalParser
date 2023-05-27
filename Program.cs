@@ -22,6 +22,7 @@ Dictionary<string, string> NameAndInchiKeyDict = new Dictionary<string, string>(
 //}
 
 //return;
+
 foreach (var line in File.ReadAllLines(filePath))
 {
     var data = line.Split(':');
@@ -33,3 +34,16 @@ var parser = new Parser(NameAndInchiKeyDict);
 await parser.StartParsing();
 
 Console.ReadKey();
+
+void ReadExcelLowThan5()
+{
+
+}
+void ReadExcelGreaterThan5()
+{
+
+}
+void ReadCSV()
+{
+
+}

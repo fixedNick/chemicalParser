@@ -11,6 +11,7 @@
     <PackageReference Include="EPPlus" Version="6.2.4" />
     <PackageReference Include="HtmlAgilityPack" Version="1.11.46" />
     <PackageReference Include="HtmlAgilityPack.CssSelectors.NetCore" Version="1.2.1" />
+    <PackageReference Include="MySqlConnector" Version="2.2.6" />
     <PackageReference Include="NPOI" Version="2.6.0" />
   </ItemGroup>
 
