@@ -17,9 +17,10 @@ namespace chemicalParser;
 /// </summary>
 /// 
 
-internal static class Sql 
+internal static class Sql
 {
     private static string ChemicalsTable = "ChemicalsInfo";
+    private static string SpectresTable = "Spectes";
 
     private static bool IsInitialized = false;
     private static string Server;
@@ -87,6 +88,27 @@ internal static class Sql
                 ChemicalsTable,
                 "RunName", "EnName", "Formula", "InChiKey", "CAS",
                 chemical.Info.RuName, chemical.Info.EnName, chemical.Info.Formula, chemical.Info.InChiKey, chemical.Info.Cas));
+        }
+    }
+
+    // Данные в этой таблице хранятся как каждая отдельная X y точка каждого отдельного спектра
+    // Предполагается, что у одного элемента может быть несколько спектров
+    // Различаться для каждого из элементов они будут по Spectreidx
+    // Пример: У метана есть 3 спектра
+    // 0,1,2 - это SpectreId каждого из трех спектров для ChemicalID метана
+    // ChemicalId совпадает с ID из таблицы ChemicalsTable
+    // Важно понимать, что в у нас может быть так же и информация о допустим Этане, у которого тоже 3 спектра
+    // При этом у каждого спектра Этана так же будут SpectreId 0,1,2
+    // Потому что SpectreId относится к конкретному ChemicalID
+    public static async void InsertSpectre(Spectre spectre)
+    {
+        foreach (var p in spectre.Points)
+        {
+            await Insert(string.Format("INSET INTO `{0}` (`{1}`,`{2}`,`{3}`, `{4}`) VALUES ('{5}', '{6}', '{7}', '{8}')",
+                SpectresTable,
+                "ChemicalId", "X", "Y", "SpectreId",
+                spectre.ChemicalID, p.X, p.Y, spectre.SpectreID
+                ));
         }
     }
 

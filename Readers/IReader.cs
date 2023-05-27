@@ -9,9 +9,4 @@ internal interface IReader
 {
 }
 
-internal abstract class ReaderBase 
-{
-    public string FileName { get; protected set; } = string.Empty;
-}
-
 // Все эти классы призваны, чтобы получить из .xls, .xlsx, .csv файла массив объектов Chemical

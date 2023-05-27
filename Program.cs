@@ -3,6 +3,10 @@ using System;
 using chemicalParser;
 using System.Drawing.Text;
 using OfficeOpenXml;
+using Org.BouncyCastle.Asn1.Mozilla;
+using Org.BouncyCastle.Crypto.Generators;
+using System.Data;
+
 
 var filePath = "db.txt";
 if (File.Exists(filePath) == false)
@@ -34,6 +38,7 @@ var parser = new Parser(NameAndInchiKeyDict);
 await parser.StartParsing();
 
 Console.ReadKey();
+
 
 void ReadExcelLowThan5()
 {

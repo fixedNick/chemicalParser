@@ -10,7 +10,7 @@ internal class Spectre
 {
     public int ChemicalID { get; private set; }
     public int SpectreID { get; private set; }
-    Point[] Points;
+    public Point[] Points;
     public Spectre(int cid, int sid, Point[] points)
     {
         Points = points; 
