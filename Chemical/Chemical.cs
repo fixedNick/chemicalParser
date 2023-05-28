@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using chemicalParser.Sql;
+using chemicalParser.SQL;
 
 namespace chemicalParser.Chemicals;
 
@@ -19,9 +19,15 @@ internal class Chemical
         Info = info;
     }
 
+    public static async Task<Chemical[]> GetChemicalsFromDatabase()
+    {
+        var result = await Sql.GetChemicalsInfo();
+        return await Task.FromResult(result);
+    }
+
     public async Task<Spectre[]> GetSpectres()
     {
-        var result = await Sql.Sql.GetChemicalSpectres(Info.Id);
+        var result = await Sql.GetChemicalSpectres(Info.Id);
         return await Task.FromResult(result);
     }
 }

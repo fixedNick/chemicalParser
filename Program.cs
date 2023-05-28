@@ -1,7 +1,7 @@
 ﻿using System.IO;
 using System;
 using chemicalParser;
-using chemicalParser.Sql;
+using chemicalParser.SQL;
 using System.Drawing.Text;
 using OfficeOpenXml;
 using Org.BouncyCastle.Asn1.Mozilla;

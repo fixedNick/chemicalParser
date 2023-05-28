@@ -14,4 +14,14 @@ internal class ChemicalInfo
     public string Formula { get; private set; }
     public string InChiKey { get; private set; }
     public string Cas { get; private set; }
+
+    public ChemicalInfo(int id, string ruName, string enName, string formula, string inchikey, string cas)
+    {
+        Id = id;
+        RuName = ruName;
+        EnName = enName;
+        Formula = formula;
+        InChiKey = inchikey;
+        Cas = cas;
+    }
 }

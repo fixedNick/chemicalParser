@@ -15,7 +15,7 @@ using System.Threading.Tasks;
 /// TODO
 /// Продумать работу с Chemical.Info, чтобы при внесении нового объекта в бд обратно получался и устанавливался его ID
 
-namespace chemicalParser.Sql;
+namespace chemicalParser.SQL;
 
 /// <summary>
 /// Данный класс сконструирован для работы только с ОДНОЙ БАЗОЙ ДАННЫХ
@@ -192,5 +192,39 @@ internal static class Sql
         await connection.DisposeAsync();
 
         return await Task.FromResult(result);
+    }
+
+    /// <summary>
+    /// Метод для получения всех химических элементов из базы данных
+    /// </summary>
+    /// <returns></returns>
+    public static async Task<Chemical[]> GetChemicalsInfo()
+    {
+        var result = new List<Chemical>();
+        var connection = await OpenConnection();
+
+        var query = string.Format("SELECT * FROM `{0}`", ChemicalsTable);
+        var cmd = connection.CreateCommand();
+        cmd.CommandText = query;
+
+        var reader = await cmd.ExecuteReaderAsync();
+        while(reader.ReadAsync().GetAwaiter().GetResult())
+        {
+            var cid = reader.GetInt32(Fields.ChemicalID);
+            var ruName = reader.GetString(Fields.RuName);
+            var enName = reader.GetString(Fields.EnName);
+            var formula = reader.GetString(Fields.Formula);
+            var inchikey = reader.GetString(Fields.InChiKey);
+            var cas = reader.GetString(Fields.CAS);
+            ChemicalInfo cInfo = new ChemicalInfo(cid, ruName, enName, formula, inchikey, cas);
+            Chemical chemical = new Chemical(cInfo);
+
+            result.Add(chemical);
+        }
+
+        await connection.CloseAsync();
+        await connection.DisposeAsync();
+
+        return await Task.FromResult(result.ToArray());
     }
 }
