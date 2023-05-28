@@ -31,9 +31,3 @@ class GraphWorkingArea
         MaxY = maxy;
     }
 }
-
-struct Point
-{
-    public double X;
-    public double Y;
-}

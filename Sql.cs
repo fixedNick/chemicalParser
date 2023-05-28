@@ -1,15 +1,21 @@
 ﻿using chemicalParser.Chemicals;
 using chemicalParser.Readers;
 using MySqlConnector;
+using NPOI.DDF;
+using NPOI.SS.Formula;
 using OfficeOpenXml.Sorting;
+using Org.BouncyCastle.Crypto.Macs;
 using System;
 using System.Collections.Generic;
-using System.Drawing;
+using System.Configuration;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace chemicalParser;
+/// TODO
+/// Продумать работу с Chemical.Info, чтобы при внесении нового объекта в бд обратно получался и устанавливался его ID
+
+namespace chemicalParser.Sql;
 
 /// <summary>
 /// Данный класс сконструирован для работы только с ОДНОЙ БАЗОЙ ДАННЫХ
@@ -17,10 +23,26 @@ namespace chemicalParser;
 /// </summary>
 /// 
 
+static class Fields
+{
+    // TABLE ChemicalsTable
+    public static readonly string ChemicalID = "ChemicalId";
+    public static readonly string InChiKey = "InChiKey";
+    public static readonly string CAS = "CAS";
+    public static readonly string RuName = "RuName";
+    public static readonly string EnName = "EnName";
+    public static readonly string Formula = "Formula";
+
+    public static readonly string SpectreID = "SpectreId";
+    public static readonly string X = "X";
+    public static readonly string Y = "Y";
+}
+
 internal static class Sql
 {
-    private static string ChemicalsTable = "ChemicalsInfo";
-    private static string SpectresTable = "Spectes";
+    // TABLES
+    private static readonly string ChemicalsTable = "ChemicalsInfo";
+    private static readonly string SpectresTable = "Spectres";
 
     private static bool IsInitialized = false;
     private static string Server;
@@ -86,7 +108,7 @@ internal static class Sql
         {
             await Insert(string.Format("INSERT INTO `{0}` (`{1}`,`{2}`,`{3}`,`{4}`,`{5}`) VALUE ('{6}','{7}','{8}','{9}','{10}')",
                 ChemicalsTable,
-                "RunName", "EnName", "Formula", "InChiKey", "CAS",
+                Fields.RuName, Fields.EnName, Fields.Formula, Fields.InChiKey, Fields.CAS,
                 chemical.Info.RuName, chemical.Info.EnName, chemical.Info.Formula, chemical.Info.InChiKey, chemical.Info.Cas));
         }
     }
@@ -104,16 +126,71 @@ internal static class Sql
     {
         foreach (var p in spectre.Points)
         {
-            await Insert(string.Format("INSET INTO `{0}` (`{1}`,`{2}`,`{3}`, `{4}`) VALUES ('{5}', '{6}', '{7}', '{8}')",
+            await Insert(string.Format("INSET INTO `{0}` (`{1}`,`{2}`,`{3}`,`{4}`) VALUES ('{5}', '{6}', '{7}', '{8}')",
                 SpectresTable,
-                "ChemicalId", "X", "Y", "SpectreId",
+                Fields.ChemicalID, Fields.X, Fields.Y, Fields.SpectreID,
                 spectre.ChemicalID, p.X, p.Y, spectre.SpectreID
                 ));
-        }
+        }       
     }
 
+    
+    /// ???
     public static async void InsertSingleJDX(JDXInfo jdx)
     {
 
+    }
+
+
+    /// <summary>
+    /// Получает массив спектров для конкретного ChemicalId
+    /// </summary>
+    /// <param name="id">Chemical Id</param>
+    /// <returns>Массив спектров</returns>
+    public static async Task<Spectre[]> GetChemicalSpectres(int cid)
+    {
+        var connection = await OpenConnection();
+
+        var query = string.Format("SELECT * FROM `{0}` WHERE `{1}` = '{2}'",
+            SpectresTable,
+            Fields.ChemicalID,
+            cid);
+
+        var cmd = connection.CreateCommand();
+        cmd.CommandText = query;
+
+
+        Dictionary<int, List<Point>> spectresInfo = new Dictionary<int, List<Chemicals.Point>>();
+
+        var reader = await cmd.ExecuteReaderAsync();
+        while(reader.ReadAsync().GetAwaiter().GetResult())
+        {
+            var spectreId = reader.GetInt32(Fields.SpectreID);
+            var x = reader.GetDouble(Fields.X);
+            var y = reader.GetDouble(Fields.Y);
+
+            // Если такого ключа нет, то занимаем ключ и инитим лист поинтов
+            if (spectresInfo.ContainsKey(spectreId) == false)
+                spectresInfo[spectreId] = new List<Point>();
+            
+            spectresInfo[spectreId].Add(new Point(x, y));
+        }
+
+        
+        var result = new Spectre[spectresInfo.Count];
+        int resultIdx = 0;
+        foreach(var s in spectresInfo)
+        {
+            // sort by x from ..400 to 4000..
+            s.Value.Sort(Point.Empty);
+
+            var spectre = new Spectre(cid, s.Key, s.Value.ToArray());
+            result[resultIdx++] = spectre;
+        }
+
+        await connection.CloseAsync();
+        await connection.DisposeAsync();
+
+        return await Task.FromResult(result);
     }
 }

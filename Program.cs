@@ -1,12 +1,13 @@
 ﻿using System.IO;
 using System;
 using chemicalParser;
+using chemicalParser.Sql;
 using System.Drawing.Text;
 using OfficeOpenXml;
 using Org.BouncyCastle.Asn1.Mozilla;
 using Org.BouncyCastle.Crypto.Generators;
 using System.Data;
-
+using chemicalParser.Chemicals;
 
 var filePath = "db.txt";
 if (File.Exists(filePath) == false)
