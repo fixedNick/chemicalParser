@@ -8,5 +8,5 @@ namespace chemicalParser.Readers;
 
 internal abstract class ReaderBase
 {
-    public string FileName { get; protected set; } = string.Empty;
+    public string FilePath { get; protected set; } = string.Empty;
 }

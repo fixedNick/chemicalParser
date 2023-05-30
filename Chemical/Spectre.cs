@@ -17,4 +17,7 @@ internal class Spectre
         ChemicalID = cid;
         SpectreID = sid;
     }
+    public Point[] GetZipPoints()
+    {
+    }
 }

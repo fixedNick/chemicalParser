@@ -4,20 +4,8 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace chemicalParser.Chemicals;
-
-internal class JDXInfo
-{
-    public GraphWorkingArea WorkingArea;
-    public Point[] GraphPoints;
-    public JDXInfo(Point[] points, GraphWorkingArea workingArea)
-    {
-        GraphPoints = points;
-        WorkingArea = workingArea;
-    }
-}
-
-class GraphWorkingArea
+namespace chemicalParser.JDX;
+internal class GraphWorkingArea
 {
     public double MinX { get; private set; }
     public double MaxX { get; private set; }

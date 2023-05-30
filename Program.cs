@@ -1,55 +1,21 @@
-﻿using System.IO;
-using System;
-using chemicalParser;
-using chemicalParser.SQL;
-using System.Drawing.Text;
-using OfficeOpenXml;
-using Org.BouncyCastle.Asn1.Mozilla;
-using Org.BouncyCastle.Crypto.Generators;
-using System.Data;
+﻿using chemicalParser.SQL;
+using chemicalParser.Parser;
+using chemicalParser.Readers;
 using chemicalParser.Chemicals;
 
-var filePath = "db.txt";
-if (File.Exists(filePath) == false)
-{
-    Console.WriteLine("Файл не найден!");
-    return;
-}
+Sql.Initialize("db4free.net", "wqgwqg", "fgewgwfgewgw", "fgewgw");
 
-Dictionary<string, string> NameAndInchiKeyDict = new Dictionary<string, string>();
+IReader<Chemical> reader = new CsvReader<Chemical>(filePath: "test.csv", startRowIndex: 1);
+var chemicals = await reader.Read(insertToDatabase: true);
 
-//using(ExcelPackage package = new ExcelPackage(filePath))
-//{
-//    ExcelWorkbook wb = package.Workbook;
-//    ExcelWorksheet sheet = wb.Worksheets[0];
-//    var rows = sheet.Rows;
-//    var cols = sheet.Columns;
-//}
+var chemicalsFromDatabase = await Sql.GetChemicals();
 
-//return;
-
-foreach (var line in File.ReadAllLines(filePath))
-{
-    var data = line.Split(':');
-    if (NameAndInchiKeyDict.ContainsKey(data[0])) continue;
-    NameAndInchiKeyDict.Add(data[0], data[1]);
-}
-
-var parser = new Parser(NameAndInchiKeyDict);
+var parser = new Parser(chemicals, insertSpectresInDatabase: true);
 await parser.StartParsing();
 
-Console.ReadKey();
+List<Spectre[]> spectres = new List<Spectre[]>();
+foreach(var c in chemicals)
+    spectres.Add(await c.GetSpectres());
 
-
-void ReadExcelLowThan5()
-{
-
-}
-void ReadExcelGreaterThan5()
-{
-
-}
-void ReadCSV()
-{
-
-}
+while (true)
+    Thread.Sleep(5000);
