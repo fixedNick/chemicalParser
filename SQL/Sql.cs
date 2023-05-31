@@ -3,6 +3,8 @@
 using chemicalParser.JDX;
 using chemicalParser.Readers;
 using chemicalParser.Chemicals;
+using NPOI.POIFS.EventFileSystem;
+using chemicalParser.Exceptions;
 
 namespace chemicalParser.SQL;
 
@@ -26,14 +28,18 @@ static class Fields
     public static readonly string SpectreID = "SID";
     public static readonly string X = "X";
     public static readonly string Y = "Y";
+    public static readonly string XFactor = "XFactor";
+    public static readonly string YFactor = "YFactor";
+    public static readonly string DeltaX = "YFactor";
 }
 
 static class Tables
 {
-    public static readonly string ChemicalsTable = "ChemicalsInfo";
-    public static readonly string CIDtoSIDTable = "CIDtoSID";
-    public static readonly string BaseSpectresTable = "Spectres";
-    public static readonly string ZippedSpectresTable = "SpectresZipped";
+    public static readonly string Chemicals = "ChemicalsInfo";
+    public static readonly string CIDtoSID = "CIDtoSID";
+    public static readonly string BaseSpectres = "Spectres";
+    public static readonly string ZippedSpectres = "SpectresZipped";
+    public static readonly string SpectresInfo = "SpectresInfo";
 }
 internal static class Sql
 {
@@ -101,7 +107,7 @@ internal static class Sql
         foreach (var chemical in chemicals)
         {
             rowsAdded = await Insert(string.Format("INSERT INTO `{0}` (`{1}`,`{2}`,`{3}`,`{4}`,`{5}`, `{6}`) VALUE ('{7}','{8}','{9}','{10}','{11}', '{12}')",
-                Tables.ChemicalsTable,
+                Tables.Chemicals,
                 Fields.RuName, Fields.EnName, Fields.Formula, Fields.InChiKey, Fields.CAS, Fields.ChemicalType,
                 chemical.Info.RuName, chemical.Info.EnName, chemical.Info.Formula, chemical.Info.InChiKey, chemical.Info.Cas, (int)chemical.Info.ChemicalType));
         }
@@ -126,7 +132,7 @@ internal static class Sql
         foreach (var p in spectre.Points)
         {
             var query = string.Format("INSERT INTO `{0}` (`{1}`,`{2}`,`{3}`,`{4}`) VALUES ('{5}', {6}, {7}, '{8}')",
-                isZipped ? Tables.ZippedSpectresTable : Tables.BaseSpectresTable,
+                isZipped ? Tables.ZippedSpectres : Tables.BaseSpectres,
                 Fields.ChemicalID, Fields.X, Fields.Y, Fields.SpectreID,
                 spectre.ChemicalID, p.X.ToString().Replace(',', '.'), p.Y.ToString().Replace(',', '.'), spectre.SpectreID
                 );
@@ -149,7 +155,7 @@ internal static class Sql
 
             // Проверить какой максимальный ID у спектров конкретного ChemicalID
             string queryGetMaxSID = @$"SELECT MAX({Fields.SpectreID}) 
-                   FROM {Tables.BaseSpectresTable}";
+                   FROM {Tables.BaseSpectres}";
 
             using var command = connection.CreateCommand();
             command.CommandText = queryGetMaxSID;
@@ -170,7 +176,7 @@ internal static class Sql
             connection.Close();
             connection.Dispose();
 
-            var spectre = new Spectre(chemicalId, maxID, jdx.GraphPoints);
+            var spectre = new Spectre(chemicalId, maxID, jdx.GraphPoints, jdx.YFactor, jdx.XFactor, jdx.DeltaX);
             var insertSpectreInfo = new InsertSpectreInfo(spectre, false);
 
             Thread insertThread = new Thread(new ParameterizedThreadStart(InsertSpectre));
@@ -188,7 +194,7 @@ internal static class Sql
     {
         using var connection = await OpenConnection();
 
-        var queryGetSpectreIds = $"SELECT `{Fields.SpectreID}` FROM `{Tables.CIDtoSIDTable}` WHERE `{Fields.ChemicalID}` = '{cid}'";
+        var queryGetSpectreIds = $"SELECT `{Fields.SpectreID}` FROM `{Tables.CIDtoSID}` WHERE `{Fields.ChemicalID}` = '{cid}'";
         List<int> sids = new List<int>();
         using (var cmd = connection.CreateCommand())
         {
@@ -203,7 +209,7 @@ internal static class Sql
         foreach (var sid in sids)
         {
             var queryGetSpectres = string.Format("SELECT * FROM `{0}` WHERE `{1}` = '{2}'",
-                zipped ? Tables.ZippedSpectresTable : Tables.BaseSpectresTable,
+                zipped ? Tables.ZippedSpectres : Tables.BaseSpectres,
                 Fields.SpectreID,
                 sid);
 
@@ -225,7 +231,8 @@ internal static class Sql
         foreach (var spectreKeyValue in spectresInfo)
         {
             spectreKeyValue.Value.Sort(Point.Empty);
-            result[resultIdx++] = new Spectre(cid, spectreKeyValue.Key, spectreKeyValue.Value.ToArray());
+            var spectreInfo = await GetSpectreInfo(spectreKeyValue.Key);
+            result[resultIdx++] = new Spectre(cid, spectreKeyValue.Key, spectreKeyValue.Value.ToArray(), spectreInfo);
         }
 
         await connection.CloseAsync();
@@ -235,9 +242,8 @@ internal static class Sql
     {
         using var connection = await OpenConnection();
 
-        var getSpectreQuery = string.Format("SELECT `{0}`,`{1}` FROM `{2}` WHERE `{3}` = '{4}'",
-                                            Fields.X, Fields.Y,
-                                            isZipped ? Tables.ZippedSpectresTable : Tables.BaseSpectresTable,
+        var getSpectreQuery = string.Format("SELECT * FROM `{0}` WHERE `{1}` = '{2}'",
+                                            isZipped ? Tables.ZippedSpectres : Tables.BaseSpectres,
                                             Fields.SpectreID,
                                             sid);
         using var cmd = connection.CreateCommand();
@@ -245,17 +251,46 @@ internal static class Sql
         using var pointsReader = await cmd.ExecuteReaderAsync();
 
         var points = new List<Point>();
-        while(await pointsReader.ReadAsync())
+
+        while (await pointsReader.ReadAsync())
         {
             var x = pointsReader.GetDouble(Fields.X);
             var y = pointsReader.GetDouble(Fields.Y);
+
             points.Add(new Point(x, y));
         }
         await connection.CloseAsync();
-
         var cid = await GetCIDFromSID(sid);
-        var resultSpectre = new Spectre(cid, sid, points.ToArray());
+        var spectreInfo = await GetSpectreInfo(sid);
+
+        var resultSpectre = new Spectre(cid, sid, points.ToArray(), spectreInfo);
         return await Task.FromResult(resultSpectre);
+    }
+
+    public static async Task<SpectreInfo> GetSpectreInfo(int sid)
+    {
+        using var connection = await OpenConnection();
+        SpectreInfo spectreInfo;
+
+        using var cmd = connection.CreateCommand();
+        var getSIQuery = string.Format("SELECT * FROM `{0}` WHERE `{1}` = '{2}'",
+                            Tables.SpectresInfo,
+                            Fields.SpectreID, sid);
+        cmd.CommandText = getSIQuery;
+
+        using var siReader = await cmd.ExecuteReaderAsync();
+        while (await siReader.ReadAsync())
+        {
+            var yFactor = siReader.GetDouble(Fields.YFactor);
+            var xFactor = siReader.GetDouble(Fields.XFactor);
+            var xDelta = siReader.GetDouble(Fields.DeltaX);
+
+            await connection.CloseAsync();
+            spectreInfo = new SpectreInfo(xFactor, yFactor, xDelta);
+            return await Task.FromResult(spectreInfo);
+        }
+        await connection.CloseAsync();
+        throw new NotFoundException($"Не удалось найти spectreInfo в бд для SID {sid}");
     }
 
     public static async Task<int> GetCIDFromSID(int sid)
@@ -263,8 +298,8 @@ internal static class Sql
         using var connection = await OpenConnection();
 
         var getCIDfromSIDQuery = string.Format("SELECT `{0}` FROM `{1}` WHERE `{2}` = '{3}'",
-                                                Fields.ChemicalID, 
-                                                Tables.CIDtoSIDTable,
+                                                Fields.ChemicalID,
+                                                Tables.CIDtoSID,
                                                 Fields.SpectreID,
                                                 sid);
         using var cmd = connection.CreateCommand();
@@ -277,7 +312,7 @@ internal static class Sql
             return await Task.FromResult(cid);
         }
         await connection.CloseAsync();
-        throw new ValuesNotFoundException();
+        throw new NotFoundException("Min/Max values not found");
     }
 
 
@@ -289,7 +324,7 @@ internal static class Sql
     {
         var result = new List<Chemical>();
         using var connection = await OpenConnection();
-        var query = string.Format("SELECT * FROM `{0}`", Tables.ChemicalsTable);
+        var query = string.Format("SELECT * FROM `{0}`", Tables.Chemicals);
         using var cmd = connection.CreateCommand();
         cmd.CommandText = query;
         using var reader = await cmd.ExecuteReaderAsync();
@@ -315,7 +350,7 @@ internal static class Sql
         var connection = await OpenConnection();
         var cmd = connection.CreateCommand();
 
-        var query = string.Format("SELECT MAX({0}) FROM {1}", Fields.ChemicalID, Tables.ChemicalsTable);
+        var query = string.Format("SELECT MAX({0}) FROM {1}", Fields.ChemicalID, Tables.Chemicals);
         cmd.CommandText = query;
 
         var result = await cmd.ExecuteScalarAsync();
@@ -334,7 +369,7 @@ internal static class Sql
         var cmd = connection.CreateCommand();
 
         var query = string.Format("SELECT * FROM `{0}` WHERE `{1}` = '{2}' AND `{3}` = '{4}' AND `{5}` = '{6}' AND `{7}` = '{8}'",
-            Tables.ChemicalsTable,
+            Tables.Chemicals,
             Fields.Formula, formula,
             Fields.InChiKey, inchikey,
             Fields.CAS, cas,

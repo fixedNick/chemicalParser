@@ -9,8 +9,8 @@ using System.Threading.Tasks;
 
 using chemicalParser.JDX;
 using chemicalParser.SQL;
+using chemicalParser.Utils;
 using chemicalParser.Chemicals;
-using NPOI.OpenXmlFormats;
 
 namespace chemicalParser.Parser;
 
@@ -105,7 +105,7 @@ internal class Parser
     {
         if (Directory.Exists(DownloadsDirectory) == false) Directory.CreateDirectory(DownloadsDirectory);
 
-        var renamedFile = GetFreeFileName(DownloadsDirectory, chemical.Info.EnName);
+        var renamedFile = Util.GetFreeFileName(DownloadsDirectory, chemical.Info.EnName);
 
         using (HttpClient httpClient = new HttpClient())
         {
@@ -118,21 +118,7 @@ internal class Parser
         if (InsertSpectresInDatabase)
         {
             Jdx jdxInfo = new Jdx($"{DownloadsDirectory}/{renamedFile}");
-            jdxInfo.ParseJdx();
             await Sql.InsertBaseSpectreFromJDX(jdxInfo, chemical.Info.Id);
-        }
-    }
-
-    private string GetFreeFileName(string downloadsDirectory, string name)
-    {
-        var files = Directory.GetFiles(DownloadsDirectory);
-        int counter = 0;
-        while (true)
-        {
-            var fileName = $"{name}_{counter}.jdx";
-            if (File.Exists($"{downloadsDirectory}/{fileName}") == true)
-                counter++;
-            else return $"{fileName}";
         }
     }
 

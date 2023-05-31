@@ -1,4 +1,5 @@
 ﻿using chemicalParser.Chemicals;
+using chemicalParser.Exceptions;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -11,34 +12,50 @@ namespace chemicalParser.JDX;
 internal class Jdx
 {
     private string FilePath;
+    private static readonly string xFactorKey = "X";
+    private static readonly string yFactorKey = "Y";
+
+    public double XFactor
+    {
+        get => Factors.Where(f => f.Key.Equals(xFactorKey)).First().Value;
+    }
+
+    public double YFactor
+    {
+        get => Factors.Where(f => f.Key.Equals(yFactorKey)).First().Value;
+    }
+    public double DeltaX { get; private set; }
 
     public JdxPair[] Info;
     public Point[] GraphPoints;
     public GraphWorkingArea WorkingArea;
 
+    private KeyValuePair<string, double>[] Factors;
+
     public Jdx(string filePath)
     {
         FilePath=filePath;
+        ParseJdx();
     }
 
-    public void ParseJdx()
+    private void ParseJdx()
     {
         var fileLines = new List<string>();
         using (var streamReader = new StreamReader(new FileStream(FilePath, FileMode.Open)))
         {
-            while(streamReader.EndOfStream == false)
+            while (streamReader.EndOfStream == false)
             {
                 var line = streamReader.ReadLine();
-                if(line is not null)
+                if (line is not null)
                     fileLines.Add(line);
             }
-           
+
         }
 
         var jdxData = new List<string>();
         for (var i = 0; i < fileLines.Count; i++)
         {
-            if (fileLines[i].Contains("Collection") || fileLines[i].Contains("United States"))
+            if (fileLines[i].Contains("Collection") || fileLines[i].Contains("United States") || fileLines[i].Contains("$"))
                 continue;
             jdxData.Add(fileLines[i]);
         }
@@ -46,43 +63,57 @@ internal class Jdx
         List<JdxPair> pairs = new List<JdxPair>();
         List<Point> points = new List<Point>();
 
-        foreach(var line in jdxData)
+        foreach (var line in jdxData)
         {
             if (line.StartsWith("##"))
             {
                 var splitted = line.Split('=');
-                if(splitted.Length >= 2)
-                    pairs.Add(new JdxPair(splitted[0].Replace("#", ""), splitted[1]));
-            }
-            else if(line is not null)
-            {
-                var splitted = line.Split(' ');
                 if (splitted.Length >= 2)
-                {
-                    if(double.TryParse(splitted[0].Replace('.', ','), out double x) && double.TryParse(splitted[1].Replace('.', ','), out double y)) points.Add(new Point(x,y));  
-                }
+                    pairs.Add(new JdxPair(splitted[0].Replace("#", ""), splitted[1]));
             }
         }
 
+        var xDeltaString = pairs.Where(p => p.Key.Trim().ToLower() == "deltax").FirstOrDefault()?.Value?.Replace('.', ',').Trim() ?? "1";
+        var xDelta = double.Parse(xDeltaString);
+
         double xFactor = 1;
         var xFactorPair = pairs.Where(p => p.Key.Trim().ToLower() == "xfactor").FirstOrDefault();
-        if(xFactorPair is not null)
-            xFactor = Convert.ToDouble(xFactorPair.Value.Trim().Replace('.',','));
+        if (xFactorPair is not null)
+            xFactor = Convert.ToDouble(xFactorPair.Value.Trim().Replace('.', ','));
 
         double yFactor = 1;
         var yFactorPair = pairs.Where(p => p.Key.Trim().ToLower() == "yfactor").FirstOrDefault();
         if (yFactorPair is not null)
             yFactor = Convert.ToDouble(yFactorPair.Value.Trim().Replace('.', ','));
 
-        for(var i = 0; i < points.Count; i++)
+        Factors = new KeyValuePair<string, double>[] {
+            new KeyValuePair<string,double>(xFactorKey, xFactor),
+            new KeyValuePair<string, double>(yFactorKey, yFactor)
+        };
+        this.DeltaX = xDelta;
+
+        var isDataSection = false;
+        foreach (var line in jdxData)
         {
-            points[i].X *= xFactor;
-            points[i].Y *= yFactor;
+            if (line.StartsWith("##XYDATA=(X++(Y..Y))"))
+                isDataSection = true;
+
+            if (isDataSection == false) continue;
+
+            if (line.StartsWith("#")) continue;
+
+            var splitted = line.Split(' ');
+            var x = double.Parse(splitted[0].Replace('.', ',').Trim()) / xFactor;
+            for (int i = 1; i < splitted.Length; i++)
+            {
+                var y = double.Parse(splitted[i].Replace('.', ',').Trim()) * yFactor;
+                points.Add(new Point(x, y));
+                x += xDelta;
+            }
         }
 
         Info = pairs.ToArray();
         GraphPoints = points.ToArray();
-
 
         var min_X = pairs.Where(p => p.Key.Trim().ToLower() == "minx").FirstOrDefault();
         var max_X = pairs.Where(p => p.Key.Trim().ToLower() == "maxx").FirstOrDefault();
@@ -96,6 +127,6 @@ internal class Jdx
                 Convert.ToDouble(min_Y.Value.Replace('.', ',').Trim()),
                 Convert.ToDouble(max_Y.Value.Replace('.', ',').Trim()));
         }
-        else throw new ValuesNotFoundException();
+        else throw new NotFoundException("Min/Max values not found");
     }
 }
